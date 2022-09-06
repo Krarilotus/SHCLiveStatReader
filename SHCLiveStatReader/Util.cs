@@ -27,6 +27,7 @@ namespace SHC
         
         public static void WriteData(string filename, object data)
         {
+            Console.WriteLine(filename);
             File.WriteAllText(filename, Newtonsoft.Json.JsonConvert.SerializeObject(data, Newtonsoft.Json.Formatting.Indented), Encoding.BigEndianUnicode);
         }
     }

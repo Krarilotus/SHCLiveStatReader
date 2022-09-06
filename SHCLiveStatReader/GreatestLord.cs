@@ -11,10 +11,12 @@ namespace SHC
         readonly static Dictionary<string, Dictionary<string, Dictionary<string, string>>> playerData;
         readonly static Dictionary<string, object> statsDictionary;
         public static List<Player> PlayerList { get; }
+        public static List<List<Dictionary<string, object>>> PlayerHistory { get;}
 
         static GreatestLord()
         {
             statsDictionary = new Dictionary<string, object>();
+            PlayerHistory = new List<List<Dictionary<string, object>>>();
             playerData = 
                 JsonConvert.DeserializeObject<Dictionary<string, Dictionary<string, Dictionary<string, string>>>>(File.ReadAllText("memory/greatestlord.json"));
         }
@@ -54,7 +56,7 @@ namespace SHC
 
             statsDictionary["Map"] = mapStats;
 
-            LinkedList<Dictionary<string, object>> playerStats = new LinkedList<Dictionary<string, object>>();
+            List<Dictionary<string, object>> playerStats = new List<Dictionary<string, object>>();
             for (var i = 0; i < MAX_PLAYERS; i++)
             {
                 Dictionary<string, object> currentPlayer = new Dictionary<string, object>();
@@ -102,9 +104,24 @@ namespace SHC
                     GreatestLord.CalculateScore(scoreDict["Gold"], scoreDict["LordKills"], scoreDict["WeightedTroopsKilled"], 
                     scoreDict["WeightedBuildingsDestroyed"], scoreDict["MapStartYear"], scoreDict["MapStartMonth"],
                     scoreDict["MapEndYear"], scoreDict["MapEndMonth"]);
-                playerStats.AddLast(currentPlayer);
+                
+                //Matchtime only gets loaded correctly for player 0 (because its not supposed to have an offset)
+                //gets fixed here and every player gets their own copy of matchtime
+                if (i > 0) { currentPlayer["Matchtime"] = playerStats[0]["Matchtime"]; }
+
+                playerStats.Add(currentPlayer);
+                //add income to playerstats:
+                addTaxes(i, ref playerStats);
+                addEcoScore(i, ref playerStats);
+                calculateNormedIncome(i, ref playerStats);
             }
+
             statsDictionary["PlayerStatistics"] = playerStats;
+            PlayerHistory.Add(playerStats);
+
+            //Debug Output
+            Console.WriteLine(playerStats[0]["Income"]);
+
             return statsDictionary;
         }
 
@@ -129,6 +146,92 @@ namespace SHC
             score = score * 200;
             score = score / bonusDivider;
             return score;
+        }
+
+        public static void calculateNormedIncome(int player, ref List<Dictionary<string,object>> playerStats)
+        {
+            if (PlayerHistory.Count == 0)
+            {
+                playerStats[player]["Income"] = 0;
+                return;
+            }
+
+            int currentTime = Convert.ToInt32(playerStats[0]["Matchtime"]);
+            double playerIncome = 0;
+            //calculate time point 3months in the past
+            int index = PlayerHistory.Count - 1;
+            int pastTime = currentTime;
+
+            while (pastTime > Math.Max(0, currentTime - 2400))
+            {
+                pastTime = Convert.ToInt32(PlayerHistory[index][0]["Matchtime"]);
+                if(index <= 0) { break; }
+                index--;
+            }
+
+
+            //calculate score difference and norm to 3 months
+            int timediff = currentTime - pastTime;
+            if(timediff != 0)
+            {
+                int currentScore = Convert.ToInt32(PlayerHistory[PlayerHistory.Count - 1][player]["EcoScore"]);
+                int pastScore = Convert.ToInt32(PlayerHistory[index][player]["EcoScore"]);
+                playerIncome = (Math.Abs(currentScore - pastScore)*2400)/Math.Abs(timediff); //some weird rounding happens
+            }
+            else
+            {
+                playerIncome = 0;
+            }
+            playerStats[player]["Income"] = playerIncome;
+
+        }
+
+         public static int weightedResources(int player, ref List<Dictionary<string,object>> playerStats)
+         {
+             int erg = 0;
+            erg += Convert.ToInt32(playerStats[player]["Wood"]) * 2;
+            erg += Convert.ToInt32(playerStats[player]["Stone"]) * 5;
+            erg += Convert.ToInt32(playerStats[player]["Iron"]) * 26;
+            erg += Convert.ToInt32(playerStats[player]["Pitch"]) * 18;
+            erg += Convert.ToInt32(playerStats[player]["Food"]) * 4;
+            erg += Convert.ToInt32(playerStats[player]["Weapons"]) * 15;
+            return erg;
+         }
+
+        public static void addEcoScore(int player, ref List<Dictionary<string, object>> playerStats)
+        {
+            playerStats[player]["EcoScore"] = weightedResources(player, ref playerStats) + Convert.ToInt32(playerStats[player]["Taxes"]);
+        }
+
+        public static void clearHistory()
+        {
+            PlayerHistory.Clear();
+        }
+
+        public static double taxesThisTick(int player, ref List<Dictionary<string, object>> playerStats, int lastTime, int currentTime)
+        {
+            double[] taxesPerPerson = { -0.8, -0.6, -0.4, 0, 0.6, 0.8, 1, 1.2, 1.4, 1.6, 1.8, 2 };
+            int taxSetting = Convert.ToInt32(playerStats[player]["TaxSetting"]);
+            Console.WriteLine("Taxsetting " + taxSetting);
+            Console.WriteLine("Pop " + Convert.ToInt32(playerStats[player]["Population"]));
+            int deltaTime = currentTime - lastTime;
+            Console.WriteLine("delta " + deltaTime);
+            double taxIncomeCurrent = (taxesPerPerson[taxSetting] * Convert.ToInt32(playerStats[player]["Population"]) * deltaTime) / 800;
+            Console.WriteLine("Current " + taxIncomeCurrent);
+            return taxIncomeCurrent;
+        }
+
+        public static void addTaxes(int player , ref List<Dictionary<string, object>> playerStats)
+        {
+            if (PlayerHistory.Count == 0)
+            {
+                playerStats[player]["Taxes"] = 0;
+                return;
+            }
+            int lastTime = Convert.ToInt32(PlayerHistory[PlayerHistory.Count - 1][0]["Matchtime"]);
+            int currentTime = Convert.ToInt32(playerStats[0]["Matchtime"]);
+            playerStats[player]["Taxes"] = Convert.ToInt32(PlayerHistory[PlayerHistory.Count - 1][player]["Taxes"]) + taxesThisTick(player, ref playerStats, lastTime, currentTime);
+
         }
     }
 }
