@@ -10,6 +10,7 @@ namespace SHC
         public static void Main()
         {
             BackupExistingFile(PLAYERDATA_FILENAME, GREATEST_LORD_FILENAME);
+            Console.WriteLine(PLAYERDATA_FILENAME);
 
             while(true){
                 try
@@ -24,11 +25,12 @@ namespace SHC
                 }
             }
         }
-
+        //This should back up txt files?
         private static void BackupExistingFile(string playerDataFilename, string greatestLordDataFilename)
         {
             if (File.Exists(playerDataFilename) || File.Exists(greatestLordDataFilename))
             {
+                Console.WriteLine("exists");
                 string suffix = GetNextRandom().ToString();
                 while (File.Exists(PLAYERDATA_FILE_PREFIX + suffix + DATA_FILE_SUFFIX) || File.Exists(GREATEST_LORD_FILE_PREFIX + suffix + DATA_FILE_SUFFIX))
                 {

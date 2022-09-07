@@ -5,7 +5,7 @@ using static SHC.Constants;
 
 namespace SHC
 {
-    class PlayerFactory
+    class PlayerFactory //I suggest removing this class. Certainly we dont need a class to initialize a list? (Actually i also suggest removing player)
     {
         public static List<Player> PlayerList { get; }
 

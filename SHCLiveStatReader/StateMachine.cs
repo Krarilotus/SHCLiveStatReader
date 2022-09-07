@@ -58,6 +58,8 @@ namespace SHC
             if (Lobby())
             {
                 ResetWeightedStats();
+                //greatestLords generates a history list to calculate the income for each player. Gets cleared here.
+                GreatestLord.clearHistory();
             }
         }
 
@@ -75,6 +77,7 @@ namespace SHC
             Player.Update(playerStats);
         }
 
+        //Archiving happens after a game ends
         private static void ArchiveGreatestLordStatFile()
         {
             if (File.Exists(GREATEST_LORD_FILENAME))
